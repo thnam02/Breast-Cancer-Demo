@@ -1,0 +1,3 @@
+Synthetic demo case for ReceptorLens. Not a real patient.
+Swap in case.json, thumb.jpg, and optional tiles/*.jpg or a DZI.
+Omit the mock field in case.json to hide the MOCK DATA chip.

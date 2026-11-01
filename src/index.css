@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --color-bg: #07070b;
+  --color-panel: #111118;
+  --color-gt: #f5b84b;
+  --color-model: #ff5a5f;
+  --color-gene: #3ee0b0;
+  --color-wsi: #ff5fa2;
+  --color-fuse: #7c5cff;
+  --color-ok: #7cfc8a;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1000px 480px at 12% -10%, rgba(124, 92, 255, 0.14), transparent 60%),
+    radial-gradient(800px 420px at 100% 0%, rgba(255, 90, 95, 0.08), transparent 55%),
+    #07070b;
+  color: #f5f5f7;
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+}
+
+section {
+  scroll-margin-top: 76px;
+}
+
+::selection {
+  background: rgba(124, 92, 255, 0.45);
+}
+
+:focus-visible {
+  outline: 2px solid #7c5cff;
+  outline-offset: 2px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #34343f transparent;
+}
+
+.panel {
+  background: #111118;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+}
+
+.flow-line {
+  stroke-dasharray: 5 7;
+  animation: flow 1.15s linear infinite;
+}
+
+.cls-pulse {
+  animation: cls-pulse 1.15s ease-in-out infinite;
+}
+
+.node-glow {
+  animation: node-glow 1.8s ease-in-out infinite;
+}
+
+@keyframes flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+@keyframes cls-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes node-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px currentColor);
+  }
+  50% {
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+}
+
+.katex {
+  color: #f4f4f5;
+  font-size: 1.02rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
