@@ -26,14 +26,14 @@ function mulberry32(seed) {
   };
 }
 
-function buildTiles(caseId) {
+function buildTiles(caseId, tight = false) {
   const rng = mulberry32(hashString(`${caseId}:tiles`));
-  const blobCount = 3 + Math.floor(rng() * 3);
+  const blobCount = tight ? 2 : 3 + Math.floor(rng() * 3);
   const blobs = Array.from({ length: blobCount }, () => ({
     x: WIDTH * (0.18 + rng() * 0.64),
     y: HEIGHT * (0.18 + rng() * 0.64),
-    rx: 110 + rng() * 190,
-    ry: 80 + rng() * 150,
+    rx: tight ? 70 + rng() * 90 : 110 + rng() * 190,
+    ry: tight ? 55 + rng() * 70 : 80 + rng() * 150,
   }));
 
   const tiles = [];
@@ -48,7 +48,8 @@ function buildTiles(caseId) {
         field += Math.exp(-2.15 * (dx * dx + dy * dy));
       }
       const noisy = field * (0.82 + rng() * 0.36);
-      tiles.push({ x, y, w: TILE, h: TILE, raw: 0.012 + noisy ** 1.45 });
+      const raw = tight ? noisy ** 2.4 : 0.012 + noisy ** 1.45;
+      tiles.push({ x, y, w: TILE, h: TILE, raw });
     }
   }
 
@@ -68,7 +69,8 @@ const MOCK_NOTE =
 const CASES = [
   {
     caseId: "SYN-01",
-    cohort: "TCGA-BRCA",
+    cohort: "Synthetic",
+    descriptor: "Modelled on the paper's case study (synthetic values)",
     mock: true,
     mockNote: MOCK_NOTE,
     clinical: {
@@ -100,14 +102,15 @@ const CASES = [
   },
   {
     caseId: "SYN-02",
-    cohort: "TCGA-BRCA",
+    cohort: "Synthetic",
+    descriptor: "Synthetic case 2",
     mock: true,
     mockNote: MOCK_NOTE,
     clinical: {
       age: 62,
       sex: "F",
       side: "Left",
-      histology: "Invasive ductal carcinoma",
+      histology: "Invasive lobular carcinoma",
       stage: "IIA",
       tnm: "pT2N0M0",
     },
@@ -132,14 +135,15 @@ const CASES = [
   },
   {
     caseId: "SYN-03",
-    cohort: "TCGA-BRCA",
+    cohort: "Synthetic",
+    descriptor: "Synthetic case 3",
     mock: true,
     mockNote: MOCK_NOTE,
     clinical: {
       age: 44,
       sex: "F",
       side: "Left",
-      histology: "Invasive lobular carcinoma",
+      histology: "Invasive ductal carcinoma (NST)",
       stage: "IIIA",
       tnm: "pT3N1aM0",
     },
@@ -164,7 +168,8 @@ const CASES = [
   },
   {
     caseId: "SYN-04",
-    cohort: "TCGA-BRCA",
+    cohort: "Synthetic",
+    descriptor: "Synthetic case 4 · intended PR discordance",
     mock: true,
     mockNote: MOCK_NOTE,
     clinical: {
@@ -194,6 +199,40 @@ const CASES = [
       { symbol: "TCAP", z: -0.3, receptor: "HER2" },
     ],
   },
+  {
+    caseId: "SYN-05",
+    cohort: "Synthetic",
+    descriptor: "Synthetic case 5",
+    mock: true,
+    mockNote: MOCK_NOTE,
+    tight: true,
+    clinical: {
+      age: 39,
+      sex: "F",
+      side: "Left",
+      histology: "Invasive ductal carcinoma (NST)",
+      stage: "IIA",
+      tnm: "pT2N0M0",
+    },
+    ihc: { ER: 0, PR: 0, HER2: 0 },
+    pred: { ER: 0.071, PR: 0.058, HER2: 0.094 },
+    slide: { thumb: "thumb.jpg", width: WIDTH, height: HEIGHT, dzi: null },
+    modalityAttention: [
+      [0.46, 0.22, 0.32],
+      [0.18, 0.44, 0.38],
+      [0.12, 0.27, 0.61],
+    ],
+    genes: [
+      { symbol: "ESR1", z: -2.1, receptor: "ER" },
+      { symbol: "GATA3", z: -1.5, receptor: "ER" },
+      { symbol: "AGR3", z: -1.8, receptor: "ER" },
+      { symbol: "PGR", z: -1.7, receptor: "PR" },
+      { symbol: "CA12", z: -1.0, receptor: "PR" },
+      { symbol: "ERBB2", z: -0.5, receptor: "HER2" },
+      { symbol: "GRB7", z: -0.6, receptor: "HER2" },
+      { symbol: "TCAP", z: -0.4, receptor: "HER2" },
+    ],
+  },
 ];
 
 function stats(tiles) {
@@ -208,14 +247,15 @@ await mkdir(ROOT, { recursive: true });
 await Promise.all(LEGACY_CASE_IDS.map((caseId) => rm(path.join(ROOT, caseId), { recursive: true, force: true })));
 
 for (const spec of CASES) {
-  const tiles = buildTiles(spec.caseId);
+  const { tight, ...rest } = spec;
+  const tiles = buildTiles(spec.caseId, Boolean(tight));
   const ranked = [...tiles].sort((a, b) => b.attn - a.attn);
   const topTiles = ranked.slice(0, 6).map((tile, index) => ({
     rank: index + 1,
     img: `tiles/${index + 1}.jpg`,
     attn: tile.attn,
   }));
-  const file = { ...spec, tiles, topTiles };
+  const file = { ...rest, tiles, topTiles };
   const dir = path.join(ROOT, spec.caseId);
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, "case.json"), `${JSON.stringify(file, null, 2)}\n`);

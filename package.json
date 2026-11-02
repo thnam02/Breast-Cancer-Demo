@@ -6,17 +6,25 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "lint": "tsc --noEmit",
     "preview": "vite preview",
-    "generate-cases": "node scripts/generate-cases.mjs"
+    "generate-cases": "node scripts/generate-cases.mjs",
+    "check:cases": "node --experimental-strip-types scripts/check-cases.ts"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "@react-three/postprocessing": "^3.2.2",
     "framer-motion": "^12.23.24",
+    "gsap": "^3.15.0",
     "katex": "^0.16.25",
     "openseadragon": "^5.0.1",
+    "postprocessing": "^6.39.5",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.16",
@@ -24,6 +32,7 @@
     "@types/openseadragon": "^5.0.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^5.1.0",
     "tailwindcss": "^4.1.16",
     "typescript": "^5.9.3",

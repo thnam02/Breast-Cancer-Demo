@@ -495,7 +495,7 @@ export function SlideViewer({
         <div className="absolute bottom-3 left-3 z-20 max-w-[min(280px,70%)]">
           <StoryCard
             tone="gt"
-            title="Patient record (TCGA)"
+            title={caseData.cohort === "Synthetic" || caseData.mock ? "Patient record (synthetic)" : `Patient record (${caseData.cohort})`}
             footer={caseData.mock ? "Synthetic demo record." : "Loaded from the case file."}
           >
             {patientLines.slice(0, visiblePatientLines).map((line) => (

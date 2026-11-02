@@ -15,10 +15,11 @@ export function useCountUp(target: number, active: boolean, duration = 900): num
       return;
     }
 
+    setValue(0);
     const started = performance.now();
     let frame = 0;
     const tick = (now: number) => {
-      const progress = Math.min(1, (now - started) / duration);
+      const progress = Math.min(1, Math.max(0, (now - started) / duration));
       const eased = 1 - (1 - progress) ** 3;
       setValue(target * eased);
       if (progress < 1) frame = requestAnimationFrame(tick);

@@ -30,14 +30,41 @@ export interface GeneRecord {
   receptor: Receptor;
 }
 
+export type CohortName = "TCGA-BRCA" | "CPTAC-BRCA" | "Synthetic";
+
+/** 64-d encoder tokens. Order is clinical, gene, WSI. */
+export interface CaseTokens {
+  clinical: number[];
+  gene: number[];
+  wsi: number[];
+}
+
+/** Per-tile UNI2-h summary. `norm` is the L2 of the 1536-d vector. `pca` is 3 components. */
+export interface TileEmbedding {
+  norm: number[];
+  pca: number[][];
+}
+
+/** Hidden activations captured from the forward pass. Lengths follow the layer, not the patient. */
+export interface CaseActivations {
+  clin_hidden: number[];
+  gene_hidden: number[];
+  trunk: number[];
+  her2_hidden: number[];
+}
+
 /**
  * Replay payload for one case. Every number the demo shows for a patient
- * comes from this file. `mock` marks a synthetic placeholder; omit it on
- * real exports so the synthetic-data chip stays hidden.
+ * comes from this file, or from a deterministic seed when an optional block
+ * is absent on a synthetic case. `mock` marks a synthetic placeholder; omit
+ * it on real exports so the synthetic-data chip stays hidden.
+ * Mutual information is cohort-level only and is not stored on a case.
  */
 export interface CaseFile {
   caseId: string;
-  cohort: string;
+  cohort: CohortName | string;
+  /** Neutral picker label. Synthetic cases must not encode IHC here. */
+  descriptor?: string;
   mock?: boolean;
   mockNote?: string;
   clinical: ClinicalRecord;
@@ -53,7 +80,12 @@ export interface CaseFile {
   topTiles: TopTile[];
   /** Head-averaged 4-head token attention. Rows/columns: clinical, gene, wsi. Not a contribution score. */
   modalityAttention: number[][];
+  /** Optional 4×3×3 weights with average_attn_weights left false. Mean across heads equals modalityAttention. */
+  modalityAttentionPerHead?: number[][][];
   genes: GeneRecord[];
+  tokens?: CaseTokens;
+  tileEmbedding?: TileEmbedding;
+  activations?: CaseActivations;
 }
 
 export function assertCaseFile(data: unknown): CaseFile {
@@ -74,12 +106,18 @@ export function assertCaseFile(data: unknown): CaseFile {
   ) {
     throw new Error("case.json is missing required fields");
   }
+  if ("mi" in row) delete (row as { mi?: unknown }).mi;
   return row as CaseFile;
+}
+
+export function publicUrl(path: string): string {
+  const base = import.meta.env.BASE_URL;
+  return `${base}${path.replace(/^\//, "")}`;
 }
 
 export function caseAsset(caseId: string, relative: string): string {
   if (relative.startsWith("http://") || relative.startsWith("https://") || relative.startsWith("/")) {
     return relative;
   }
-  return `/cases/${caseId}/${relative}`;
+  return publicUrl(`cases/${caseId}/${relative}`);
 }

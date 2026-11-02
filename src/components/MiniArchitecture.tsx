@@ -10,9 +10,10 @@ const COLOR = {
 
 export function MiniArchitecture({ stage }: { stage: StepId | "ready" }) {
   const hot = (id: "clinical" | "gene" | "wsi" | "mil" | "fuse" | "heads") => {
-    if (stage === "ingest") return id === "clinical" || id === "gene" || id === "wsi";
-    if (stage === "encode") return id === "mil";
-    if (stage === "fuse") return id === "fuse";
+    if (stage === "patient") return id === "clinical" || id === "gene" || id === "wsi";
+    if (stage === "tiles" || stage === "embed" || stage === "encoder") return id === "mil" || id === "wsi";
+    if (stage === "modalities") return id === "clinical" || id === "gene";
+    if (stage === "fusion") return id === "fuse";
     if (stage === "predict") return id === "heads";
     if (stage === "explain" || stage === "ready") return id === "wsi" || id === "mil";
     return false;
@@ -53,7 +54,7 @@ export function MiniArchitecture({ stage }: { stage: StepId | "ready" }) {
         fill={COLOR.wsi}
         fontSize="7"
         fontFamily="JetBrains Mono, monospace"
-        className={stage === "encode" ? "cls-pulse" : undefined}
+        className={stage === "encoder" ? "cls-pulse" : undefined}
       >
         [CLS]
       </text>

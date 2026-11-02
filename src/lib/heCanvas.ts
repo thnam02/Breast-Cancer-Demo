@@ -1,4 +1,4 @@
-import type { CaseFile, Tile } from "../types/case";
+import type { CaseFile } from "../types/case";
 
 function hashString(value: string): number {
   let hash = 2166136261;
@@ -19,105 +19,120 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-function attnAt(tiles: Tile[], x: number, y: number): number {
-  for (const tile of tiles) {
-    if (x >= tile.x && x < tile.x + tile.w && y >= tile.y && y < tile.y + tile.h) {
-      return tile.attn;
-    }
-  }
-  return 0;
-}
-
 /** Procedural H&E thumbnail. Purple tumour mass follows the tile weights in the case file. */
 export function paintSyntheticSlide(ctx: CanvasRenderingContext2D, caseData: CaseFile): void {
-  const { width, height } = caseData.slide;
+  const { width: logicalW, height: logicalH } = caseData.slide;
+  const width = ctx.canvas.width;
+  const height = ctx.canvas.height;
+  const scaleX = width / logicalW;
+  const scaleY = height / logicalH;
   const rng = mulberry32(hashString(caseData.caseId));
+  const grain = mulberry32(hashString(`${caseData.caseId}:grain`));
   const tiles = caseData.tiles;
   const maxAttn = Math.max(...tiles.map((tile) => tile.attn), 1e-12);
 
-  ctx.clearRect(0, 0, width, height);
-  const base = ctx.createLinearGradient(0, 0, width, height);
-  base.addColorStop(0, "#e7b3c0");
-  base.addColorStop(0.5, "#d89aab");
-  base.addColorStop(1, "#e4b7c4");
-  ctx.fillStyle = base;
-  ctx.fillRect(0, 0, width, height);
-
-  for (let i = 0; i < 16; i += 1) {
-    const x = rng() * width;
-    const y = rng() * height;
-    const radius = 70 + rng() * 240;
-    const wash = ctx.createRadialGradient(x, y, radius * 0.1, x, y, radius);
-    wash.addColorStop(0, rng() > 0.45 ? "rgba(246, 206, 214, 0.7)" : "rgba(176, 96, 118, 0.28)");
-    wash.addColorStop(1, "rgba(0, 0, 0, 0)");
-    ctx.fillStyle = wash;
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fill();
+  const image = ctx.createImageData(width, height);
+  const data = image.data;
+  for (let y = 0; y < height; y += 1) {
+    const ly = y / scaleY;
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 4;
+      const n = grain();
+      const lx = x / scaleX;
+      const speckle = (Math.sin(lx * 0.37) + Math.sin(ly * 0.29)) * 1.5;
+      data[i] = 188 + n * 16 + speckle;
+      data[i + 1] = 136 + n * 12 + speckle * 0.4;
+      data[i + 2] = 146 + n * 10;
+      data[i + 3] = 255;
+    }
   }
+  ctx.putImageData(image, 0, 0);
+  for (let i = 0; i < logicalW * logicalH; i += 1) rng();
 
-  ctx.save();
-  ctx.globalAlpha = 0.22;
-  ctx.strokeStyle = "#f6d5dc";
-  ctx.lineWidth = 1.4;
-  for (let i = 0; i < 28; i += 1) {
-    const x = rng() * width;
-    const y = rng() * height;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.bezierCurveTo(
-      x + 40 + rng() * 90,
-      y - 30 + rng() * 40,
-      x + rng() * 80,
-      y + 50 + rng() * 70,
-      x + 80 + rng() * 80,
-      y + 10,
-    );
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  for (let i = 0; i < 110; i += 1) {
-    const x = rng() * width;
-    const y = rng() * height;
-    if (attnAt(tiles, x, y) / maxAttn > 0.2) continue;
-    const rx = 8 + rng() * 26;
-    const ry = 6 + rng() * 18;
-    ctx.beginPath();
-    ctx.ellipse(x, y, rx, ry, rng() * Math.PI, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255, 252, 249, 0.94)";
-    ctx.fill();
-    ctx.lineWidth = 1.1;
-    ctx.strokeStyle = "rgba(206, 142, 158, 0.95)";
-    ctx.stroke();
-  }
-
+  const kind = growthKind(caseData);
   for (const tile of tiles) {
     const intensity = tile.attn / maxAttn;
     if (intensity < 0.08) continue;
-    const cx = tile.x + tile.w * (0.35 + rng() * 0.3);
-    const cy = tile.y + tile.h * (0.35 + rng() * 0.3);
-    const radius = tile.w * (0.55 + intensity * 0.45);
-    const wash = ctx.createRadialGradient(cx, cy, 1, cx, cy, radius);
-    wash.addColorStop(0, `rgba(74, 28, 112, ${0.15 + intensity * 0.72})`);
-    wash.addColorStop(0.62, `rgba(112, 52, 132, ${0.05 + intensity * 0.28})`);
-    wash.addColorStop(1, "rgba(112, 52, 132, 0)");
-    ctx.fillStyle = wash;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.fill();
+    paintGrowth(ctx, tile, intensity, scaleX, scaleY, rng, kind);
   }
+}
 
-  for (const tile of tiles) {
-    const intensity = tile.attn / maxAttn;
-    const nuclei = intensity > 0.16 ? 8 + Math.floor(intensity * 22) : 1 + Math.floor(rng() * 3);
-    for (let i = 0; i < nuclei; i += 1) {
-      const x = tile.x + rng() * tile.w;
-      const y = tile.y + rng() * tile.h;
-      ctx.beginPath();
-      ctx.ellipse(x, y, 0.8 + rng() * 1.3, 0.6 + rng() * 0.9, rng() * Math.PI, 0, Math.PI * 2);
-      ctx.fillStyle = intensity > 0.18 ? "rgba(36, 12, 58, 0.82)" : "rgba(128, 72, 96, 0.4)";
-      ctx.fill();
+type GrowthKind = "lobular" | "ductal" | "triple-negative";
+
+function growthKind(caseData: CaseFile): GrowthKind {
+  const triple = caseData.ihc.ER === 0 && caseData.ihc.PR === 0 && caseData.ihc.HER2 === 0;
+  if (triple) return "triple-negative";
+  if (caseData.clinical.histology.toLowerCase().includes("lobular")) return "lobular";
+  return "ductal";
+}
+
+function paintGrowth(
+  ctx: CanvasRenderingContext2D,
+  tile: CaseFile["tiles"][number],
+  intensity: number,
+  scaleX: number,
+  scaleY: number,
+  rng: () => number,
+  kind: GrowthKind,
+) {
+  const originX = tile.x * scaleX;
+  const originY = tile.y * scaleY;
+  const width = tile.w * scaleX;
+  const height = tile.h * scaleY;
+  if (kind === "lobular") {
+    const count = 5 + Math.floor(intensity * 7);
+    const angle = rng() * Math.PI;
+    const along = Math.cos(angle);
+    const across = Math.sin(angle);
+    for (let index = 0; index < count; index += 1) {
+      const t = (index + 0.5) / count;
+      const gap = (rng() - 0.5) * width * 0.04;
+      const x = originX + width * 0.5 + (t - 0.5) * width * 0.82 * along + gap * across;
+      const y = originY + height * 0.5 + (t - 0.5) * height * 0.82 * across + gap * along;
+      nucleus(ctx, x, y, (0.55 + rng() * 0.35) * scaleX, (0.45 + rng() * 0.3) * scaleY, rng() * Math.PI, "rgba(72, 28, 88, 0.9)");
     }
+    return;
   }
+  const nest = kind === "triple-negative" ? 16 + Math.floor(intensity * 18) : 7 + Math.floor(intensity * 8);
+  const radius = (kind === "triple-negative" ? 0.34 : 0.28) * Math.min(width, height);
+  for (let index = 0; index < nest; index += 1) {
+    const spread = kind === "ductal" ? Math.sqrt(rng()) * radius : rng() * radius;
+    const angle = rng() * Math.PI * 2;
+    const x = originX + width * 0.5 + Math.cos(angle) * spread;
+    const y = originY + height * 0.5 + Math.sin(angle) * spread;
+    const pleomorphic = kind === "triple-negative";
+    const rx = (pleomorphic ? 0.45 + rng() * 1.5 : 0.6 + rng() * 0.55) * scaleX;
+    const ry = (pleomorphic ? 0.35 + rng() * 1.2 : 0.5 + rng() * 0.4) * scaleY;
+    nucleus(ctx, x, y, rx, ry, rng() * Math.PI, intensity > 0.35 ? "rgba(42, 16, 58, 0.92)" : "rgba(110, 58, 78, 0.7)");
+  }
+}
+
+export function slideBitmap(caseData: CaseFile): HTMLCanvasElement {
+  const cached = bitmapCache.get(caseData.caseId);
+  if (cached) return cached;
+  const scale = Math.max(1, 2048 / caseData.slide.width);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(caseData.slide.width * scale);
+  canvas.height = Math.round(caseData.slide.height * scale);
+  const context = canvas.getContext("2d");
+  if (context) paintSyntheticSlide(context, caseData);
+  bitmapCache.set(caseData.caseId, canvas);
+  return canvas;
+}
+
+const bitmapCache = new Map<string, HTMLCanvasElement>();
+
+function nucleus(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  rx: number,
+  ry: number,
+  rotation: number,
+  color: string,
+) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, Math.max(0.4, rx), Math.max(0.35, ry), rotation, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
 }
