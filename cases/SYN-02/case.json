@@ -1,13 +1,14 @@
 {
   "caseId": "SYN-02",
-  "cohort": "TCGA-BRCA",
+  "cohort": "Synthetic",
+  "descriptor": "Synthetic case 2",
   "mock": true,
   "mockNote": "SYNTHETIC MOCK CASE. Not a real patient and not a TCGA record. Clinical fields, predictions, modality attention, and gene z-scores are placeholders so the viewer can replay. Replace case.json with a real export, omit mock and mockNote, add thumb.jpg plus optional tiles/*.jpg or a DZI, and list the id in index.json.",
   "clinical": {
     "age": 62,
     "sex": "F",
     "side": "Left",
-    "histology": "Invasive ductal carcinoma",
+    "histology": "Invasive lobular carcinoma",
     "stage": "IIA",
     "tnm": "pT2N0M0"
   },
