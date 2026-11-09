@@ -47,7 +47,10 @@ body.clean{cursor:none}
 /* ---------- footer (footnote + recording chrome) ---------- */
 #footer{position:fixed;left:0;bottom:0;width:1600px;height:40px;transform-origin:0 100%;display:flex;align-items:center;z-index:30;
   background:#fff;border-top:1px solid #DDE4EE;font-size:12px;line-height:15px;color:#6B7A90;transition:background .5s,color .5s,border-color .5s}
-#hint{flex:none;width:300px;padding-left:24px;white-space:nowrap}
+#hint{flex:none;width:360px;padding-left:24px;white-space:nowrap}
+#fsBtn{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+#fsBtn:hover{color:var(--navy)}
+body.dark #fsBtn:hover{color:#fff}
 #fn{flex:1;padding:0 16px;text-align:center}
 #counter{flex:none;width:200px;padding-right:24px;text-align:right;white-space:nowrap}
 body.clean #hint,body.clean #counter{visibility:hidden}
@@ -511,7 +514,7 @@ body.dark #footer{background:rgba(6,14,32,.35);border-top-color:rgba(255,255,255
 </section>
 
 </div>
-<div id="footer"><div id="hint">← → navigate · H hide UI</div><div id="fn"></div><div id="counter"></div></div>
+<div id="footer"><div id="hint">← → navigate · H hide UI · <button id="fsBtn" type="button">F full screen</button></div><div id="fn"></div><div id="counter"></div></div>
 
 <script>
 (() => {
@@ -889,8 +892,20 @@ addEventListener('keydown', e => {
   else if (k === 'Home') { e.preventDefault(); go(0, 1); }
   else if (k === 'h' || k === 'H') document.body.classList.toggle('clean');
   else if (k === 'p' || k === 'P') setAuto(!autoTimer);
+  else if (k === 'f' || k === 'F') toggleFullscreen();
 });
 addEventListener('click', () => nav(next));
+
+const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+function toggleFullscreen() {
+  const root = document.documentElement;
+  if (fsElement()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  else (root.requestFullscreen || root.webkitRequestFullscreen).call(root);
+}
+const syncFsLabel = () => { $('#fsBtn').textContent = fsElement() ? 'F exit full screen' : 'F full screen'; };
+document.addEventListener('fullscreenchange', syncFsLabel);
+document.addEventListener('webkitfullscreenchange', syncFsLabel);
+$('#fsBtn').addEventListener('click', e => { e.stopPropagation(); toggleFullscreen(); });
 
 /* ---------- init ---------- */
 document.addEventListener('DOMContentLoaded', async () => {
