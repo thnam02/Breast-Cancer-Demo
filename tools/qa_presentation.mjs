@@ -11,6 +11,31 @@ const URL = pathToFileURL(path.join(ROOT, 'presentation', 'index.html')).href;
 const OUT = path.join(ROOT, 'presentation', 'qa');
 const VIEWPORTS = [[1920, 1080], [1280, 720]];
 const SETTLE_MS = 3600; // longest step animation (tile flight + late reveals) is ~3.6 s
+const S2_ENCODE_MS = 5600; // slide 2 step 2 encodes five rows one after another (~4.9 s)
+const S2_MID_SHOTS = [1500, 3000]; // review frames inside that step; overlap is checked on resting frames only
+const S2_GRID = '50 1 0 0 1 0 0 1 0 1 0 0';
+const S2_FILL = 'nA--A--A-A--'; // n = numeric fill, A = one-hot 1, - = 0
+
+// Slide 2 encoding state: grid values and fills, source-row highlight, note, strip, connector.
+function s2State() {
+  const cells = [...document.querySelectorAll('#s2 .enc .cb')];
+  const strip = [...document.querySelectorAll('#xs .xc')];
+  return {
+    counter: document.getElementById('counter').textContent,
+    grid: cells.map(c => c.textContent.trim() || '_').join(' '),
+    fill: cells.map(c => (c.classList.contains('one') ? 'A' : c.classList.contains('num') ? 'n' : '-')).join(''),
+    hi: document.querySelectorAll('#recCard .rr.hi').length,
+    note: +getComputedStyle(document.getElementById('s2note')).opacity,
+    gridOpacity: +getComputedStyle(document.querySelector('#s2 .enc')).opacity,
+    stripOn: document.getElementById('xs').classList.contains('on'),
+    strip: strip.map(c => c.textContent).join(' '),
+    stripAtDest: strip.every(c => c.style.left === c._dest.x + 'px' && c.style.top === c._dest.y + 'px'),
+    captions: [...document.querySelectorAll('#xs .xg')].map(g => g.textContent).join(' · '),
+    conn: parseFloat(getComputedStyle(document.querySelector('#x2conn path')).strokeDashoffset),
+    connOn: document.getElementById('x2conn').classList.contains('on'),
+    mlpWait: document.querySelector('#s2 .mlp').classList.contains('wait'),
+  };
+}
 
 // Runs inside the page. Coordinates are reported in 1600x900 stage pixels.
 function analyze() {
@@ -207,13 +232,38 @@ for (const [w, h] of VIEWPORTS) {
   const steps = await page.evaluate(() => [...document.querySelectorAll('.slide')].map(s => +s.dataset.steps));
   const rows = [];
   for (let s = 0; s < steps.length; s++) for (let k = 1; k <= steps[s]; k++) {
-    if (s || k > 1) { await page.keyboard.press('ArrowRight'); await page.waitForTimeout(SETTLE_MS); }
+    if (s === 1 && k === 2) {
+      await page.keyboard.press('ArrowRight');
+      const t0 = Date.now();
+      for (const at of S2_MID_SHOTS) {
+        await page.waitForTimeout(Math.max(0, at - (Date.now() - t0)));
+        await page.screenshot({ path: path.join(OUT, tag, `slide2-step2-mid-${at / 1000}s.png`) });
+        shots++;
+        if (tag === '1920x1080' && at === S2_MID_SHOTS[0]) {
+          const m = await page.evaluate(s2State);
+          check('Slide 2 step 2 at 1.5 s: one source row highlighted, grid still filling', m.hi === 1 && m.grid !== S2_GRID, `hi=${m.hi} grid=${m.grid}`);
+        }
+      }
+      await page.waitForTimeout(Math.max(0, S2_ENCODE_MS - (Date.now() - t0)));
+    } else if (s || k > 1) { await page.keyboard.press('ArrowRight'); await page.waitForTimeout(SETTLE_MS); }
     const file = path.join(OUT, tag, `slide${s + 1}-step${k}.png`);
     await page.screenshot({ path: file });
     shots++;
     const a = await page.evaluate(analyze);
     const counter = await page.textContent('#counter');
     rows.push({ slide: s + 1, step: k, counter, texts: a.texts, graphics: a.graphics, issues: a.issues });
+    if (tag === '1920x1080' && s === 1) {
+      const m = await page.evaluate(s2State);
+      check(`Slide 2 step ${k}: counter shows 5 steps`, m.counter === `Slide 2/5 · Step ${k}/5`, m.counter);
+      if (k >= 2) check(`Slide 2 step ${k}: grid encoded, no source highlight, note shown`,
+        m.grid === S2_GRID && m.fill === S2_FILL && m.hi === 0 && m.note === 1, `grid=${m.grid} fill=${m.fill} hi=${m.hi} note=${m.note}`);
+      if (k === 2) check('Slide 2 step 2: strip not shown yet', !m.stripOn);
+      if (k >= 3) check(`Slide 2 step ${k}: x(c) strip = [${S2_GRID}], in place, grid at 50%`,
+        m.stripOn && m.strip === S2_GRID && m.stripAtDest && m.gridOpacity === 0.5 && m.captions === 'Age · Sex · Laterality · Stage · Subtype',
+        `strip=${m.strip} atDest=${m.stripAtDest} grid=${m.gridOpacity} captions=${m.captions}`);
+      if (k >= 4) check(`Slide 2 step ${k}: connector drawn, network pulses running`, m.connOn && m.conn === 0 && !m.mlpWait,
+        `on=${m.connOn} dashoffset=${m.conn} wait=${m.mlpWait}`);
+    }
     if (tag === '1920x1080') {
       if (s === 3) check(`Slide 4 step ${k}: top-attention tiles ${k === 5 ? 'shown' : 'hidden'}`, k === 5 ? a.topTiles === 6 : a.topTiles === 0, `${a.topTiles} visible`);
       else check(`Slide ${s + 1} step ${k}: no top-attention tiles`, a.topTiles === 0, `${a.topTiles} visible`);
@@ -245,6 +295,30 @@ for (const [w, h] of VIEWPORTS) {
     for (const bad of [/0\.21\b/, /0\.15\b/]) check(`Slide 4 tile weights on Fig. 5 scale (no ${bad})`, !bad.test(s4));
     check('Slide 4 tile weights: #1 = 0.00139, #2–#6 marked ≈', s4.includes('0.00139') && (s4.match(/≈0\.0013\d/g) || []).length === 5);
   }
+  if (tag === '1920x1080') {
+    // Navigation on slide 2: → mid-animation finishes the step at once; ← lands on the resting frame.
+    const press = async (key, wait = 300) => { await page.keyboard.press(key); await page.waitForTimeout(wait); };
+    const st = () => page.evaluate(s2State);
+    await press('Home'); await press('ArrowRight'); await press('ArrowRight', 1200);
+    let m = await st();
+    check('Nav: 1.2 s into slide 2 step 2 the encoding is still running', m.grid !== S2_GRID && m.hi === 1, `grid=${m.grid} hi=${m.hi}`);
+    await press('ArrowRight', 60);
+    m = await st();
+    check('Nav: → mid-animation completes step 2 instantly and moves to step 3',
+      m.counter === 'Slide 2/5 · Step 3/5' && m.grid === S2_GRID && m.fill === S2_FILL && m.hi === 0 && m.note === 1, JSON.stringify(m));
+    await page.waitForTimeout(300); await press('ArrowLeft', 60);
+    m = await st();
+    check('Nav: ← to step 2 shows its resting frame (no replay)',
+      m.counter === 'Slide 2/5 · Step 2/5' && m.grid === S2_GRID && m.hi === 0 && m.note === 1 && !m.stripOn && m.gridOpacity === 1, JSON.stringify(m));
+    await page.waitForTimeout(300); await press('ArrowRight'); await press('ArrowRight'); await press('ArrowLeft', 60);
+    m = await st();
+    check('Nav: ← to step 3 shows the assembled strip at once',
+      m.counter === 'Slide 2/5 · Step 3/5' && m.stripOn && m.stripAtDest && m.gridOpacity === 0.5, JSON.stringify(m));
+    await page.waitForTimeout(300); await press('ArrowRight'); await press('ArrowRight'); await press('ArrowLeft', 60);
+    m = await st();
+    check('Nav: ← to step 4 shows the drawn connector and running pulses',
+      m.counter === 'Slide 2/5 · Step 4/5' && m.conn === 0 && !m.mlpWait, JSON.stringify(m));
+  }
   check(`${tag}: no page errors`, errors.length === 0, errors.join(' | '));
   report.viewports[tag] = rows;
   await page.close();
@@ -258,7 +332,8 @@ let md = `# Presentation QA report\n\nPage: \`presentation/index.html\` · ${sho
 md += `Method: on every step, after animations settle, every visible text line box (DOM Range rects) is intersected with every visible graphic ` +
   `(img, canvas, SVG primitives, cells/bars/connectors marked \`.g\`) and with every other text line box. A box that contains its own label ` +
   `(table cell, head box, Σ node) is treated as a container. Overflow = text leaving its card, a clipping ancestor, the stage, or entering the footer band. ` +
-  `Any intersection > 0 px (rounded to 0.01 px) is reported, in 1600×900 stage pixels.\n\n`;
+  `Any intersection > 0 px (rounded to 0.01 px) is reported, in 1600×900 stage pixels. ` +
+  `\`slide2-step2-mid-1.5s.png\` and \`slide2-step2-mid-3s.png\` are review frames taken during the slide 2 encoding animation; they are not overlap-checked.\n\n`;
 md += `**Total issues: ${total}**\n\n`;
 for (const [tag, rows] of Object.entries(report.viewports)) {
   md += `## ${tag}\n\n| Slide | Step | Text boxes | Graphics | Overlaps / overflows |\n|---|---|---|---|---|\n`;
