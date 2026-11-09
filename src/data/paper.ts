@@ -3,7 +3,7 @@ import type { Receptor } from "../types/case";
 /** Bibliographic facts from the published chapter. Not model metrics. */
 export const PAPER = {
   title: "A Multimodal Deep Learning Framework for Breast Cancer Receptor Status Prediction",
-  citation: "Tran et al., IUKM 2026",
+  citation: "IUKM 2026",
   venue: "IUKM 2026",
   conference:
     "12th International Symposium on Integrated Uncertainty in Knowledge Modelling and Decision Making",
