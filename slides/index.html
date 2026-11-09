@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TCGA-3C-AALI · worked example · IUKM 2026</title>
+<title>TCGA-3C-AALI · worked example</title>
 <style>
 :root{
   --bg:#F3F6FA; --navy:#13294B; --ink2:#3E5272; --muted:#6B7A90; --line:#E3E9F1;
@@ -75,18 +75,16 @@ body.dark #footer{background:rgba(6,14,32,.35);border-top-color:rgba(255,255,255
 /* ---------- slide 1 ---------- */
 #s1{color:#fff}
 #s1 > *{position:absolute;left:120px}
-.t-over{top:172px;font-size:15px;line-height:20px;font-weight:700;letter-spacing:.18em;color:#8DB1FF}
-.t-title{top:204px;margin:0;width:1360px;font-size:56px;line-height:70px;font-weight:800;letter-spacing:-.015em}
-.t-sub{top:366px;margin:0;font-size:22px;line-height:30px;font-style:italic;color:#C9D6EE;white-space:nowrap}
-.t-id{top:430px;height:36px;line-height:34px;padding:0 16px;border-radius:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.24);font-size:18px;font-weight:700;letter-spacing:.04em}
-.t-caseline{top:480px;font-size:17px;line-height:24px;color:#D7E1F3;white-space:nowrap}
-.t-stages{top:556px;display:flex;align-items:center}
+.t-over{top:220px;font-size:15px;line-height:20px;font-weight:700;letter-spacing:.18em;color:#8DB1FF}
+.t-title{top:252px;margin:0;width:1360px;font-size:56px;line-height:70px;font-weight:800;letter-spacing:-.015em}
+.t-id{top:414px;height:36px;line-height:34px;padding:0 16px;border-radius:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.24);font-size:18px;font-weight:700;letter-spacing:.04em}
+.t-caseline{top:464px;font-size:17px;line-height:24px;color:#D7E1F3;white-space:nowrap}
+.t-stages{top:540px;display:flex;align-items:center}
 .t-stage{width:268px;height:100px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-top:4px solid var(--c);padding:16px 18px}
 .t-stage.wide{width:380px}
 .t-stage .k{font-size:12px;line-height:16px;font-weight:700;letter-spacing:.14em;color:var(--c)}
 .t-stage .v{margin-top:8px;font-size:20px;line-height:26px;font-weight:600;color:#fff;white-space:nowrap}
 .t-op{width:52px;text-align:center;font-size:28px;line-height:40px;color:#8DB1FF}
-.t-cite{top:720px;font-size:14px;line-height:20px;color:#8DA2C6;letter-spacing:.04em}
 
 /* ---------- slide 2 ---------- */
 .rec{left:24px;top:62px;width:552px}
@@ -253,7 +251,6 @@ body.dark #footer{background:rgba(6,14,32,.35);border-top-color:rgba(255,255,255
   data-foot="Cohort: TCGA-BRCA. Tile encoder: UNI2-h pathology foundation model. Receptors: ER, PR, HER2 (positive/negative).">
   <div class="t-over">WORKED EXAMPLE · ONE PATIENT, STEP BY STEP</div>
   <h1 class="t-title">How the model predicts receptor status<br>for one patient</h1>
-  <p class="t-sub">A Multimodal Deep Learning Framework for Breast Cancer Receptor Status Prediction</p>
   <div class="t-id">TCGA-3C-AALI</div>
   <div class="t-caseline">Female, 50 y · invasive ductal carcinoma, right breast, upper outer quadrant · AJCC stage IIB (pT2 pN1a M0) · reference case, Fig. 5</div>
   <div class="t-stages">
@@ -265,7 +262,6 @@ body.dark #footer{background:rgba(6,14,32,.35);border-top-color:rgba(255,255,255
     <div class="t-op">→</div>
     <div class="t-stage wide" style="--c:#8FA8F5"><div class="k">STAGE 4</div><div class="v">Combine &amp; predict ER · PR · HER2</div></div>
   </div>
-  <div class="t-cite">IUKM 2026</div>
 </section>
 
 <!-- ===================== SLIDE 2 · CLINICAL ===================== -->
