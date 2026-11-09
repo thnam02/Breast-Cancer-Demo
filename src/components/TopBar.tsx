@@ -48,6 +48,12 @@ export function TopBar() {
               {link.label}
             </a>
           ))}
+          <a
+            href="./slides/"
+            className="rounded-full border border-white/15 px-3 py-1 font-mono text-[12px] whitespace-nowrap text-white/75 hover:border-white/35 hover:text-white"
+          >
+            Slides
+          </a>
         </nav>
         <span className="ml-auto inline-flex items-center gap-2 rounded-full border border-ok/40 bg-ok/10 px-3 py-1 font-mono text-[11px] whitespace-nowrap text-ok">
           ● UNI2-h · 1536-d

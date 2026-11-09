@@ -9,7 +9,8 @@
     "lint": "tsc --noEmit",
     "preview": "vite preview",
     "generate-cases": "node scripts/generate-cases.mjs",
-    "check:cases": "node --experimental-strip-types scripts/check-cases.ts"
+    "check:cases": "node --experimental-strip-types scripts/check-cases.ts",
+    "qa:presentation": "node tools/qa_presentation.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
@@ -29,11 +30,13 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.16",
     "@types/katex": "^0.16.7",
+    "@types/node": "^24.19.2",
     "@types/openseadragon": "^5.0.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^5.1.0",
+    "playwright-core": "^1.65.0",
     "tailwindcss": "^4.1.16",
     "typescript": "^5.9.3",
     "vite": "^7.1.12"
