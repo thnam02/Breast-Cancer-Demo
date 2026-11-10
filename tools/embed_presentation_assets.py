@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inline presentation/assets (images, gene strip) and Inter fonts into presentation/index.html.
+"""Inline presentation/assets (images, top-tile locations) and Inter fonts into presentation/index.html.
 
 Rewrites the blocks between the ASSETS / FONTS markers so the page stays a single self-contained
 file (data: URLs also keep the tissue-mask canvas readable when opened from file://).
@@ -33,9 +33,6 @@ def replace_block(html: str, name: str, body: str) -> str:
 
 def main() -> None:
     assets = {name: "data:image/jpeg;base64," + b64(ASSETS / f"{name}.jpg") for name in IMAGES}
-    strip = ASSETS / "gene_strip.json"
-    if strip.exists():
-        assets["geneStrip"] = json.loads(strip.read_text())
     tiles = ASSETS / "top_tiles.json"
     if tiles.exists():
         assets["topTiles"] = json.loads(tiles.read_text())

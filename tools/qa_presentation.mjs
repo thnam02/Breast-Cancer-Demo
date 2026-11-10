@@ -13,10 +13,8 @@ const VIEWPORTS = [[1920, 1080], [1280, 720]];
 const SETTLE_MS = 3600; // longest step animation (tile flight + late reveals) is ~3.6 s
 const S2_ENCODE_MS = 5600; // slide 2 step 2 encodes five rows one after another (~4.9 s)
 const S2_MID_SHOTS = [1500, 3000]; // review frames inside that step; overlap is checked on resting frames only
-const S3_SETTLE_MS = { 1: 5800, 2: 4800 }; // slide 3: schematic panels + reads (~5.3 s); strip grow + landmarks (~4.1 s)
 const S4_TILES_MS = 6400;  // slide 4 step 5: six tiles 800 ms apart + magnifier (~5.5 s)
 const S4_MID_SHOTS = [500, 3000];
-const settleFor = (s, k) => (s === 2 && S3_SETTLE_MS[k]) || SETTLE_MS;
 
 // Slide 4 step 5 markers, all in 1600x900 stage px.
 const TOP_TILES = JSON.parse(fs.readFileSync(path.join(ROOT, 'presentation', 'assets', 'top_tiles.json'), 'utf8'));
@@ -48,34 +46,6 @@ function s4State() {
   return { rings, badges, captions, leaders, leaderHits, wsi, lens: [...document.querySelectorAll('.tlens')].filter(shown).length,
     note: document.getElementById('tsrc').textContent };
 }
-// Landmark callouts must show exactly what tools/gene_strip.py wrote.
-const GENE_STRIP = JSON.parse(fs.readFileSync(path.join(ROOT, 'presentation', 'assets', 'gene_strip.json'), 'utf8'));
-const fmtN = n => n.toLocaleString('en-US');
-const rankText = (rank, total) => {
-  const p = 100 * rank / total;
-  return p < 0.1 ? `#${fmtN(rank)} of ${fmtN(total)}` : `top ${p < 10 ? p.toFixed(1) : Math.round(p)}%`;
-};
-const S3_EXPECTED = Object.fromEntries((GENE_STRIP.landmarks || []).map(l =>
-  [l.gene, `log2 = ${l.log2.toFixed(2)} · ${rankText(l.rank, GENE_STRIP.genes_total)}`]));
-const GREEN = 'rgb(31, 157, 116)';
-
-function s3State() {
-  const vis = el => { for (let e = el; e && e.nodeType === 1; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.visibility === 'hidden' || +cs.opacity < 0.05) return false; } return true; };
-  const lm = [...document.querySelectorAll('#strip .lmb')];
-  return {
-    counter: document.getElementById('counter').textContent,
-    panels: [...document.querySelectorAll('#bioCard .bp.on')].length,
-    foot: +getComputedStyle(document.getElementById('biofoot')).opacity,
-    greyColours: [...new Set([...document.querySelectorAll('#strip .gb')].map(b => getComputedStyle(b).backgroundColor))],
-    greenShown: lm.filter(vis).length,
-    greenColours: [...new Set(lm.map(b => getComputedStyle(b).backgroundColor))],
-    callouts: Object.fromEntries([...document.querySelectorAll('#s3co .co')].filter(vis).map(c => [c.dataset.gene, c.querySelector('.cov').textContent])),
-    leaders: [...document.querySelectorAll('#s3lead path.on')].length,
-    links: document.getElementById('lkCard').classList.contains('on') ? document.querySelectorAll('#lkRow .lk').length : 0,
-    colourScale: [...document.querySelectorAll('#s3 *')].some(e => /gradient/.test(getComputedStyle(e).backgroundImage)),
-  };
-}
-
 const S2_GRID = '50 1 0 0 1 0 0 1 0 1 0 0';
 const S2_FILL = 'nA--A--A-A--'; // n = numeric fill, A = one-hot 1, - = 0
 
@@ -216,11 +186,10 @@ function analyze() {
   const topTiles = [...document.querySelectorAll('img[data-top]')].filter(shown).length;
   const s3 = document.getElementById('s3');
   const s3media = [...s3.querySelectorAll('img, canvas')].length;
-  const s3colors = new Set([...s3.querySelectorAll('#strip .gb')].map(b => getComputedStyle(b).backgroundColor));
   const minFont = Math.min(...texts.filter(t => !t.el.closest('#footer')).map(t => parseFloat(getComputedStyle(t.el).fontSize)));
   return {
     slide: active.id, texts: texts.length, graphics: graphics.length, issues, minFont,
-    visText, topTiles, s3media, s3colors: [...s3colors],
+    visText, topTiles, s3media,
     encoderOnSlide: /encoder/i.test(visText),
   };
 }
@@ -317,7 +286,7 @@ for (const [w, h] of VIEWPORTS) {
         }
       }
       await page.waitForTimeout(Math.max(0, S2_ENCODE_MS - (Date.now() - t0)));
-    } else if (s || k > 1) { await page.keyboard.press('ArrowRight'); await page.waitForTimeout(settleFor(s, k)); }
+    } else if (s || k > 1) { await page.keyboard.press('ArrowRight'); await page.waitForTimeout(SETTLE_MS); }
     const file = path.join(OUT, tag, `slide${s + 1}-step${k}.png`);
     await page.screenshot({ path: file });
     shots++;
@@ -369,23 +338,8 @@ for (const [w, h] of VIEWPORTS) {
       if (s === 3) check(`Slide 4 step ${k}: top-attention tiles ${k === 5 ? 'shown' : 'hidden'}`, k === 5 ? a.topTiles === 6 : a.topTiles === 0, `${a.topTiles} visible`);
       else check(`Slide ${s + 1} step ${k}: no top-attention tiles`, a.topTiles === 0, `${a.topTiles} visible`);
       if (s === 2) {
-        check(`Slide 3 step ${k}: no heatmap / per-gene colours`, a.s3media === 0 && a.s3colors.length === 1, `img/canvas=${a.s3media}, strip colours=${a.s3colors.join(',')}`);
-        const m = await page.evaluate(s3State);
-        const nLm = Object.keys(S3_EXPECTED).length;
-        check(`Slide 3 step ${k}: counter shows 5 steps`, m.counter === `Slide 3/5 · Step ${k}/5`, m.counter);
-        check(`Slide 3 step ${k}: no colour scale anywhere on the slide`, !m.colourScale && m.greyColours.length === 1 && m.greenColours.every(c => c === GREEN),
-          `grey=${m.greyColours.join(',')} green=${m.greenColours.join(',')} gradient=${m.colourScale}`);
-        if (k === 1) check('Slide 3 step 1: all four schematic panels and the result line shown, no landmark bars',
-          m.panels === 4 && m.foot === 1 && m.greenShown === 0, `panels=${m.panels} foot=${m.foot} green=${m.greenShown}`);
-        if (k === 2) {
-          check(`Slide 3 step 2: exactly ${nLm} green landmark bars, one leader each`, nLm <= 4 && m.greenShown === nLm && m.leaders === nLm,
-            `green=${m.greenShown} leaders=${m.leaders} expected=${nLm}`);
-          const bad = Object.entries(S3_EXPECTED).filter(([g, t]) => m.callouts[g] !== t);
-          check('Slide 3 step 2: landmark callouts match tools/gene_strip.py output', bad.length === 0 && Object.keys(m.callouts).length === nLm,
-            Object.entries(m.callouts).map(([g, t]) => `${g}: ${t}`).join(' | '));
-          check('Slide 3 step 2: clinical link row shows 3 cards', m.links === 3, `${m.links}`);
-        }
-        if (k >= 3) check(`Slide 3 step ${k}: clinical link row hidden again`, m.links === 0, `${m.links}`);
+        check(`Slide 3 step ${k}: counter shows 3 steps`, (await page.textContent('#counter')) === `Slide 3/5 · Step ${k}/3`);
+        check(`Slide 3 step ${k}: no heatmap image on the slide`, a.s3media === 0, `img/canvas=${a.s3media}`);
       }
       if (s === 4) {
         check(`Slide 5 step ${k}: no "Encoder" boxes`, !a.encoderOnSlide);
