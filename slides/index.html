@@ -302,10 +302,24 @@ body.dark #footer{background:rgba(6,14,32,.35);border-top-color:rgba(255,255,255
 .cat192{width:28px;height:210px;border-radius:4px;
   background:repeating-linear-gradient(to bottom,rgba(255,255,255,.4) 0 1px,transparent 1px 4.375px),
   linear-gradient(to bottom,var(--clin) 0 33.333%,var(--gene) 33.333% 66.667%,var(--wsi) 66.667% 100%)}
-.fbar5{position:absolute;height:24px;border-radius:6px;background:var(--fus)}
-.on .fbar5{animation:fpulse 2.4s ease-in-out infinite;animation-delay:var(--d)}
-@keyframes fpulse{0%,45%,100%{filter:none}18%{filter:brightness(1.7)}}
-.flab5{position:absolute;font-size:13px;line-height:18px;font-weight:700;white-space:nowrap}
+/* column ③ shared layers: MLP drawn top → bottom, signal pass loops while column ③/④ is current */
+#mlp5{overflow:visible}
+.mrow5,.medge5{opacity:0;transition:opacity .35s ease var(--d)}
+#mlp5.built .mrow5,#mlp5.built .medge5{opacity:1}
+.e5{stroke:#1E3A8A;stroke-width:1;stroke-opacity:.12}
+.n5c{fill:#fff;stroke:#1E3A8A;stroke-width:2}
+.mlab5{position:absolute;font-size:13px;line-height:18px;font-weight:600;color:#1E3A8A;white-space:nowrap}
+.mell5{position:absolute;width:16px;text-align:center;font-size:12px;line-height:18px;font-weight:700;color:#1E3A8A}
+.sdot5{fill:#6E8BFF;opacity:0;filter:drop-shadow(0 0 3px rgba(110,139,255,.9))}
+#s5.sig .sedge5{animation:sedge5 2.5s linear infinite;animation-delay:var(--d)}
+#s5.sig .snode5{animation:snode5 2.5s linear infinite;animation-delay:var(--d)}
+#s5.sig .sdot5{animation:sdot5 2.5s linear infinite;animation-delay:var(--d)}
+#s5.sig .hd5{animation:hd5 2.5s ease-in-out infinite;animation-delay:var(--d)}
+@keyframes sedge5{0%{stroke-opacity:.12}4%,16%{stroke-opacity:.6}24%,100%{stroke-opacity:.12}}
+@keyframes snode5{0%{fill:#fff}4%{fill:#C7D2FE}8%,100%{fill:#fff}}
+@keyframes sdot5{0%{cx:var(--x1);cy:var(--y1);opacity:0}2%{opacity:1}18%{cx:var(--x2);cy:var(--y2);opacity:1}20%,100%{cx:var(--x2);cy:var(--y2);opacity:0}}
+@keyframes hd5{0%,24%,100%{stroke-width:2;filter:none}6%,14%{stroke-width:3.5;filter:drop-shadow(0 0 4px rgba(30,58,138,.45))}}
+#s5.instant .mrow5,#s5.instant .medge5{transition:none!important}
 .blk{position:absolute;display:flex;align-items:center;justify-content:center;height:30px;border-radius:8px;border:1.5px solid;background:#fff;font-size:13px;line-height:16px;font-weight:600;white-space:nowrap}
 .ring5{position:absolute;width:64px;height:64px}
 .ring5 svg{position:absolute;left:0;top:0}
@@ -616,10 +630,12 @@ body.dark #footer{background:rgba(6,14,32,.35);border-top-color:rgba(255,255,255
   <div class="card" data-step="3" style="left:776px;top:170px;width:290px;height:676px">
     <div class="colcap"><span class="cnum">3</span>Combine</div>
     <div class="cat192 abs g" style="left:24px;top:145px"></div>
-    <div class="abs" style="left:16px;top:365px;font-size:13px;line-height:18px;font-weight:600;white-space:nowrap">192 numbers (3 × 64)</div>
-    <div class="t5" style="left:120px;top:148px">Shared layers</div>
-    <div class="abs" id="funnel" style="left:0;top:0;width:290px;height:340px"></div>
-    <div class="p5" style="left:16px;top:420px;width:258px">The three summaries are joined end to end, then shrunk step by step.</div>
+    <div class="p5" style="left:70px;top:146px;width:204px">The three summaries are joined end to end, then shrunk step by step.</div>
+    <div class="abs" style="left:70px;top:322px;font-size:13px;line-height:18px;font-weight:600;white-space:nowrap">192 numbers (3 × 64)</div>
+    <div class="t5" style="left:70px;top:380px">Shared layers (MLP)</div>
+    <svg class="abs" id="mlp5" style="left:0;top:0" width="290" height="676"></svg>
+    <div class="abs" id="mlp5lab" style="left:0;top:0;width:290px;height:676px"></div>
+    <div class="n5" style="left:16px;top:656px">ReLU · batch norm · dropout after each layer</div>
   </div>
 
   <!-- ④ prediction heads -->
@@ -676,7 +692,6 @@ const TILE_NOTE = 'Attention map computed over all 1,024 tiles; training used up
 const PROBS = { ER: 0.96, PR: 0.91, HER2: 0.78, illustrative: true };
 const LAB = { ER: 'Positive', PR: 'Positive', HER2: 'Positive' };   // TCGA IHC/ISH labels (paper Sect. 3.5)
 const ATT = [[0.30, 0.42, 0.28], [0.16, 0.52, 0.32], [0.18, 0.38, 0.44]];   // illustrative; rows sum to 1 (C, G, S)
-const TRUNK = [192, 128, 64, 32];  // shared-layer widths drawn in the funnel
 const MIN_GAP_MS = 250;        // ignore navigation faster than this (held keys, double clicks)
 let A;                         // window.ASSETS, defined by the inlined script at the end of the file
 const $ = (s, r = document) => r.querySelector(s);
@@ -1002,14 +1017,49 @@ function buildFusion() {
   $('#att5').innerHTML = `<tr><th class="rh"></th>${MOD.map(m => `<th>${m.name}</th>`).join('')}</tr>` +
     ATT.map((row, i) => `<tr><th class="rh">${MOD[i].name}</th>` +
       row.map(v => `<td style="background:rgba(30,58,138,${(0.35 * v / max).toFixed(3)})">${v.toFixed(2)}</td>`).join('') + '</tr>').join('');
+}
 
-  const f = $('#funnel'), axis = 175;
-  TRUNK.forEach((n, i) => {
-    const w = 110 * n / TRUNK[0], top = 178 + i * 40;
-    f.insertAdjacentHTML('beforeend',
-      `<div class="fbar5 g" data-n="${n}" style="left:${axis - w / 2}px;top:${top}px;width:${w}px;--d:${(i * 0.3).toFixed(1)}s"></div>` +
-      `<div class="flab5" style="left:${axis + w / 2 + 8}px;top:${top + 3}px">${n}</div>`);
+// Column ③ in card px: 4 rows of representative nodes (not the real widths), 68 px apart, labels in one column.
+const TRUNK5 = [{ n: 192, nodes: 8, pitch: 22 }, { n: 128, nodes: 6, pitch: 22 }, { n: 64, nodes: 4, pitch: 30 }, { n: 32, nodes: 3, pitch: 34 }];
+const MLP5 = { ax: 125, y0: 434, dy: 68, r: 9, labX: 230, ellGap: 36, loop: 2500, pairMs: 600 };
+function buildShared5() {
+  const svg = $('#mlp5'), lab = $('#mlp5lab'), { ax, y0, dy, r } = MLP5;
+  const rows = TRUNK5.map((L, i) => {
+    const y = y0 + i * dy, half = L.nodes / 2, ell = L.n >= 128, xs = [];
+    for (let j = 0; j < L.nodes; j++) xs.push(j * L.pitch + (ell && j >= half ? MLP5.ellGap - L.pitch : 0));
+    const off = ax - xs[xs.length - 1] / 2;
+    return { ...L, y, ell, xs: xs.map(x => x + off) };
   });
+  const r5 = rng(53), gE = svgEl('g', {}, svg), gD = svgEl('g', {}, svg), gN = svgEl('g', {}, svg);
+  const reached = rows.map(() => new Set());
+  rows.slice(0, -1).forEach((A, p) => {
+    const B = rows[p + 1], g = svgEl('g', { class: 'medge5', style: `--d:${(p + 1) * 150 + 100}ms` }, gE), lit = [];
+    A.xs.forEach((xa, a) => B.xs.forEach((xb, b) => {
+      const ln = svgEl('line', { x1: xa, y1: A.y + r, x2: xb, y2: B.y - r, class: 'e5' }, g);
+      if (r5() < 0.25) lit.push({ ln, b, xa, xb });
+    }));
+    lit.forEach((e, j) => {   // a fixed ~25% subset per layer pair brightens in sequence
+      e.ln.classList.add('sedge5');
+      e.ln.style.setProperty('--d', `${p * MLP5.pairMs + j * 25}ms`);
+      reached[p + 1].add(e.b);
+    });
+    const e = lit[Math.floor(lit.length / 2)], at = t => ({ x: e.xa + (e.xb - e.xa) * t, y: A.y + r + (B.y - A.y - 2 * r) * t });
+    const s = at(0.2), t = at(0.8);   // dot stays off the node rims
+    svgEl('circle', { class: 'sdot5', r: 3, style: `--x1:${s.x}px;--y1:${s.y}px;--x2:${t.x}px;--y2:${t.y}px;--d:${p * MLP5.pairMs + 50}ms` }, gD);
+  });
+  rows.forEach((R, i) => {
+    const g = svgEl('g', { class: 'mrow5', 'data-n': R.n, style: `--d:${i * 150}ms` }, gN);
+    R.xs.forEach((x, j) => {
+      const c = svgEl('circle', { cx: x, cy: R.y, r, class: 'n5c' }, g);
+      if (reached[i].has(j)) { c.classList.add('snode5'); c.style.setProperty('--d', `${(i - 1) * MLP5.pairMs + 450}ms`); }
+    });
+    lab.insertAdjacentHTML('beforeend', `<div class="mlab5" style="left:${MLP5.labX}px;top:${R.y - 9}px">${R.n}</div>`);
+    if (R.ell) {
+      const mid = (R.xs[R.nodes / 2 - 1] + R.xs[R.nodes / 2]) / 2;
+      lab.insertAdjacentHTML('beforeend', `<div class="mell5" style="left:${mid - 8}px;top:${R.y - 9}px">⋯</div>`);
+    }
+  });
+  $$('#c34 .hd5').forEach((h, i) => h.style.setProperty('--d', `${3 * MLP5.pairMs + i * 200}ms`));
 }
 
 // [colour, path in stage px]; a dot travels along every link longer than an arrow stub.
@@ -1017,10 +1067,11 @@ const LINKS = {
   c12: [['#E09A2B', 'M324,300 C384,300 383,350 443,350'], ['#1F9D74', 'M324,420 C384,420 383,420 443,420'],
         ['#7B5CD6', 'M324,540 C384,540 383,490 443,490']],
   c23: [['#E09A2B', 'M579,350 C690,350 690,350 800,350'], ['#1F9D74', 'M579,420 C690,420 690,420 800,420'],
-        ['#7B5CD6', 'M579,490 C690,490 690,490 800,490'], ['#1E3A8A', 'M828,420 C862,420 862,360 896,360']],
-  c34: [['#1E3A8A', 'M951,492 L951,520'],
-        ['#2563EB', 'M951,520 C1001,505 1171,262 1279,262'], ['#16A34A', 'M951,520 C1031,520 1179,412 1279,412'],
-        ['#DC2626', 'M951,520 C1031,530 1089,562 1169,562'],
+        ['#7B5CD6', 'M579,490 C690,490 690,490 800,490'], ['#1E3A8A', 'M814,527 V572 Q814,580 822,580 H893 Q901,580 901,588']],
+  // Heads leave the 32-row's right side between the "64" and "32" labels, then climb in nested lanes so none cross.
+  c34: [['#2563EB', 'M946,803 C966,803 966,766 986,766 H1080 Q1088,766 1088,758 V270 Q1088,262 1096,262 H1279', 'hd5'],
+        ['#16A34A', 'M946,808 C966,808 966,774 986,774 H1090 Q1098,774 1098,766 V420 Q1098,412 1106,412 H1279', 'hd5'],
+        ['#DC2626', 'M946,813 C966,813 966,782 986,782 H1100 Q1108,782 1108,774 V570 Q1108,562 1116,562 H1169', 'hd5'],
         ['#2563EB', 'M1343,262 L1351,262'], ['#2563EB', 'M1393,262 L1401,262'],
         ['#16A34A', 'M1343,412 L1351,412'], ['#16A34A', 'M1393,412 L1401,412'],
         ['#DC2626', 'M1265,562 L1273,562'], ['#DC2626', 'M1343,562 L1351,562'], ['#DC2626', 'M1393,562 L1401,562']],
@@ -1028,7 +1079,7 @@ const LINKS = {
 function buildConnectors() {
   for (const [id, links] of Object.entries(LINKS)) {
     const svg = $('#' + id), defs = svgEl('defs', {}, svg);
-    links.forEach(([c, d], i) => {
+    links.forEach(([c, d, cls], i) => {
       const mid = `ah-${id}-${i}`;
       const stub = /^M[\d.]+,[\d.]+ L/.test(d) && !d.startsWith('M951');
       if (stub) {
@@ -1036,7 +1087,7 @@ function buildConnectors() {
           markerUnits: 'userSpaceOnUse', orient: 'auto' }, defs);
         svgEl('path', { d: 'M0,0 L6,3 L0,6 z', fill: c }, mk);
       }
-      const p = svgEl('path', { d, class: 'conn', stroke: c, ...(stub ? { 'marker-end': `url(#${mid})` } : {}) }, svg);
+      const p = svgEl('path', { d, class: cls ? `conn ${cls}` : 'conn', stroke: c, ...(stub ? { 'marker-end': `url(#${mid})` } : {}) }, svg);
       if (!stub && p.getTotalLength() > 30) {
         const dot = svgEl('circle', { r: 3.5, fill: c, class: 'dot' }, svg);
         svgEl('animateMotion', { dur: '2.4s', repeatCount: 'indefinite', begin: `${(-i * 0.5).toFixed(1)}s`, path: d }, dot);
@@ -1414,6 +1465,14 @@ const hooks = {
   },
   s5(k, from) {
     if (k === 4 && from < 4) animateRings(true); else animateRings(false);
+    // Shared layers: rows build top → bottom when column ③ appears; the signal loops while ③ or ④ is current.
+    const sl = $('#s5'), mlp = $('#mlp5'), build = k === 3 && from === 2;
+    sl.classList.add('instant');
+    mlp.classList.toggle('built', k >= 3 && !build);
+    void sl.offsetWidth;
+    sl.classList.remove('instant');
+    if (build) mlp.classList.add('built');
+    sl.classList.toggle('sig', k === 3 || k === 4);
   }
 };
 
@@ -1433,6 +1492,7 @@ function render(prevS, prevK) {
   $$('[data-show]', sl).forEach(e => e.classList.toggle('on', +e.dataset.show <= K));
   $$('[data-only]', sl).forEach(e => e.classList.toggle('on', +e.dataset.only === K));
   const from = prevS === S ? prevK : (prevS < S ? 0 : 99);
+  if (sl.id !== 's5') $('#s5').classList.remove('sig');
   hooks[sl.id] && hooks[sl.id](K, from);
   speedAnims();
   document.body.classList.toggle('dark', !!sl.dataset.dark);
@@ -1492,7 +1552,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#probNote').textContent = PROBS.illustrative ? 'illustrative probabilities · threshold 0.5' : 'threshold 0.5';
   $('#attnStats').textContent += ATTENTION_NOTE;
   if (TILE_NOTE) $('#s4').dataset.foot += ' ' + TILE_NOTE;
-  buildGeneStrip(); buildBio(); buildGallery(); buildTokens(); buildFusion(); buildConnectors(); buildStrip();
+  buildGeneStrip(); buildBio(); buildGallery(); buildTokens(); buildFusion(); buildConnectors(); buildShared5(); buildStrip();
   await Promise.all([initTissue(), document.fonts.ready]);
   buildLeaders();
   buildTopTiles();
