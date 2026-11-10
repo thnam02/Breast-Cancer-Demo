@@ -1,0 +1,122 @@
+[
+ {
+  "rank": 1,
+  "x": 386.11,
+  "y": 346.92,
+  "w": 3.49,
+  "h": 3.49,
+  "weight": 0.00139,
+  "weight_source": "paper Fig. 5D",
+  "source": "template_match",
+  "score": 0.9034,
+  "match_mode": "gray",
+  "slide": "TCGA-3C-AALI-01Z-00-DX1.svs",
+  "level0": [
+   55304,
+   49672,
+   496
+  ],
+  "coarse_level_tile_px": 32.0,
+  "he_registration_score": 0.9099
+ },
+ {
+  "rank": 2,
+  "x": 332.08,
+  "y": 202.8,
+  "w": 3.43,
+  "h": 3.43,
+  "weight": 0.00138,
+  "weight_source": "paper Fig. 5D",
+  "source": "template_match",
+  "score": 0.9133,
+  "match_mode": "gray",
+  "slide": "TCGA-3C-AALI-01Z-00-DX1.svs",
+  "level0": [
+   47627,
+   29195,
+   488
+  ],
+  "coarse_level_tile_px": 32.0,
+  "he_registration_score": 0.9099
+ },
+ {
+  "rank": 3,
+  "x": 425.74,
+  "y": 224.4,
+  "w": 3.49,
+  "h": 3.49,
+  "weight": 0.00137,
+  "weight_source": "paper Fig. 5D",
+  "source": "template_match",
+  "score": 0.9306,
+  "match_mode": "gray",
+  "slide": "TCGA-3C-AALI-01Z-00-DX1.svs",
+  "level0": [
+   60935,
+   32264,
+   496
+  ],
+  "coarse_level_tile_px": 32.0,
+  "he_registration_score": 0.9099
+ },
+ {
+  "rank": 4,
+  "x": 224.02,
+  "y": 210.05,
+  "w": 3.43,
+  "h": 3.43,
+  "weight": 0.00136,
+  "weight_source": "paper Fig. 5D",
+  "source": "template_match",
+  "score": 0.9148,
+  "match_mode": "gray",
+  "slide": "TCGA-3C-AALI-01Z-00-DX1.svs",
+  "level0": [
+   32273,
+   30225,
+   488
+  ],
+  "coarse_level_tile_px": 32.0,
+  "he_registration_score": 0.9099
+ },
+ {
+  "rank": 5,
+  "x": 231.18,
+  "y": 224.46,
+  "w": 3.43,
+  "h": 3.43,
+  "weight": 0.00135,
+  "weight_source": "paper Fig. 5D",
+  "source": "template_match",
+  "score": 0.9233,
+  "match_mode": "gray",
+  "slide": "TCGA-3C-AALI-01Z-00-DX1.svs",
+  "level0": [
+   33291,
+   32273,
+   488
+  ],
+  "coarse_level_tile_px": 32.0,
+  "he_registration_score": 0.9099
+ },
+ {
+  "rank": 6,
+  "x": 447.39,
+  "y": 267.7,
+  "w": 3.43,
+  "h": 3.43,
+  "weight": 0.00135,
+  "weight_source": "paper Fig. 5D",
+  "source": "template_match",
+  "score": 0.937,
+  "match_mode": "gray",
+  "slide": "TCGA-3C-AALI-01Z-00-DX1.svs",
+  "level0": [
+   64011,
+   38417,
+   488
+  ],
+  "coarse_level_tile_px": 32.0,
+  "he_registration_score": 0.9099
+ }
+]
