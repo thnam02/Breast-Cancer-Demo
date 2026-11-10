@@ -225,7 +225,7 @@ function analyze() {
   };
 }
 
-// Slide 5 structure: connector/arc crossings, funnel bars, head lengths, "Encoder" anywhere in the slide.
+// Slide 5 structure: connector/arc crossings, shared-layer rows, head lengths, "Encoder" anywhere in the slide.
 function fusionChecks() {
   const s5 = document.getElementById('s5');
   const polys = [...s5.querySelectorAll('path.conn, path.arc5')].map(p => {
@@ -251,12 +251,11 @@ function fusionChecks() {
       if (x && ![...A.ends, ...B.ends].some(e => near(x, e, 10))) { crossings.push([A.id, B.id]); a = A.pts.length; break; }
     }
   }
-  const bars = [...s5.querySelectorAll('.fbar5')];
+  const layers = [...s5.querySelectorAll('#mlp5 .mrow5')].map(g => ({ n: g.dataset.n, nodes: g.querySelectorAll('circle').length }));
   const rows = Object.fromEntries([...s5.querySelectorAll('.row5')].map(r => [r.dataset.r, r.querySelectorAll('.blk').length]));
   return {
     paths: polys.length, crossings,
-    funnel: bars.map(b => +b.dataset.n), funnelLabels: [...s5.querySelectorAll('.flab5')].map(l => l.textContent.trim()),
-    funnelWidths: bars.map(b => b.getBoundingClientRect().width),
+    layers, layerLabels: [...s5.querySelectorAll('#mlp5lab .mlab5')].map(l => l.textContent.trim()),
     rows, encoder: /encoder/i.test(s5.textContent),
   };
 }
@@ -396,12 +395,11 @@ for (const [w, h] of VIEWPORTS) {
         const f = await page.evaluate(fusionChecks);
         check('Slide 5: "Encoder" absent from the whole slide (incl. hidden text)', !f.encoder);
         check(`Slide 5: no connector or arc crosses another (${f.paths} paths)`, f.crossings.length === 0, f.crossings.map(c => c.join(' × ')).join(' | '));
-        const want = ['192', '128', '64', '32'];
-        const prop = f.funnelWidths.every((w, i) => Math.abs(w / f.funnelWidths[0] - +want[i] / 192) < 0.01);
-        check('Slide 5: funnel has exactly 4 bars labelled 192/128/64/32, widths proportional',
-          f.funnel.length === 4 && f.funnel.join() === want.join() && f.funnelLabels.join() === want.join() && prop,
-          `bars=${f.funnel.join('/')} labels=${f.funnelLabels.join('/')} widths=${f.funnelWidths.map(w => w.toFixed(1)).join('/')}`);
-        check('Slide 5: HER2 row has one more block than ER and PR',
+            const want = ['192', '128', '64', '32'];
+        check('Slide 5: shared layers drawn as exactly 4 rows labelled 192/128/64/32 with 8/6/4/3 nodes',
+          f.layers.map(l => l.n).join() === want.join() && f.layerLabels.join() === want.join() && f.layers.map(l => l.nodes).join() === '8,6,4,3',
+          `rows=${f.layers.map(l => l.n + ':' + l.nodes).join(' ')} labels=${f.layerLabels.join('/')}`);
+    check('Slide 5: HER2 row has one more block than ER and PR',
           f.rows.HER2 === f.rows.ER + 1 && f.rows.HER2 === f.rows.PR + 1, JSON.stringify(f.rows));
       }
     }
