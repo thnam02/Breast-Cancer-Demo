@@ -36,6 +36,9 @@ def main() -> None:
     strip = ASSETS / "gene_strip.json"
     if strip.exists():
         assets["geneStrip"] = json.loads(strip.read_text())
+    tiles = ASSETS / "top_tiles.json"
+    if tiles.exists():
+        assets["topTiles"] = json.loads(tiles.read_text())
     js = "window.ASSETS = " + json.dumps(assets, separators=(",", ":")) + ";"
 
     faces = []

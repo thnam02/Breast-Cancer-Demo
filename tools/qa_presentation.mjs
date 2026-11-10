@@ -13,6 +13,69 @@ const VIEWPORTS = [[1920, 1080], [1280, 720]];
 const SETTLE_MS = 3600; // longest step animation (tile flight + late reveals) is ~3.6 s
 const S2_ENCODE_MS = 5600; // slide 2 step 2 encodes five rows one after another (~4.9 s)
 const S2_MID_SHOTS = [1500, 3000]; // review frames inside that step; overlap is checked on resting frames only
+const S3_SETTLE_MS = { 1: 5800, 2: 4800 }; // slide 3: schematic panels + reads (~5.3 s); strip grow + landmarks (~4.1 s)
+const S4_TILES_MS = 6400;  // slide 4 step 5: six tiles 800 ms apart + magnifier (~5.5 s)
+const S4_MID_SHOTS = [500, 3000];
+const settleFor = (s, k) => (s === 2 && S3_SETTLE_MS[k]) || SETTLE_MS;
+
+// Slide 4 step 5 markers, all in 1600x900 stage px.
+const TOP_TILES = JSON.parse(fs.readFileSync(path.join(ROOT, 'presentation', 'assets', 'top_tiles.json'), 'utf8'));
+function s4State() {
+  const stage = document.getElementById('stage'), sr = stage.getBoundingClientRect(), sc = sr.width / 1600;
+  const box = r => ({ x: (r.left - sr.left) / sc, y: (r.top - sr.top) / sc, w: r.width / sc, h: r.height / sc });
+  const shown = el => { for (let e = el; e && e.nodeType === 1; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.visibility === 'hidden' || +cs.opacity < 0.05) return false; } return true; };
+  const toStage = (el, x, y) => { const p = new DOMPoint(x, y).matrixTransform(el.getScreenCTM()); return { x: (p.x - sr.left) / sc, y: (p.y - sr.top) / sc }; };
+  const rings = [...document.querySelectorAll('#tmsvg .tring')].filter(shown).map(g => {
+    const c = g.querySelector('circle.tr'), p = toStage(c, +c.getAttribute('cx'), +c.getAttribute('cy'));
+    return { ...p, r: +c.getAttribute('r') * c.getScreenCTM().a / sc, source: g.dataset.source, score: g.dataset.score === '' ? null : +g.dataset.score,
+      rank: g.dataset.rank === '' ? null : +g.dataset.rank, running: g.getAnimations({ subtree: true }).filter(a => a.playState === 'running').length };
+  });
+  const badges = [...document.querySelectorAll('#tmarks .tbadge')].filter(shown).map(b => ({ ...box(b.getBoundingClientRect()), text: b.textContent }));
+  const captions = ['#capB', '#tsrc'].map(s => document.querySelector(s)).filter(shown).map(e => {
+    const rg = document.createRange(); rg.selectNodeContents(e); const r = rg.getBoundingClientRect(); return box(r);
+  });
+  const imgs = [...document.querySelectorAll('#gal img')].map(i => box(i.getBoundingClientRect()));
+  let leaderHits = 0, leaders = 0;
+  for (const p of document.querySelectorAll('#tmsvg path.tlead')) {
+    if (!shown(p)) continue;
+    leaders++;
+    for (let s = 0, L = p.getTotalLength(); s <= L; s += 1) {
+      const q = p.getPointAtLength(s), v = toStage(p, q.x, q.y);
+      if (imgs.some(b => v.x >= b.x && v.x <= b.x + b.w && v.y >= b.y && v.y <= b.y + b.h)) { leaderHits++; break; }
+    }
+  }
+  const wsi = box(document.getElementById('wsi').getBoundingClientRect());
+  return { rings, badges, captions, leaders, leaderHits, wsi, lens: [...document.querySelectorAll('.tlens')].filter(shown).length,
+    note: document.getElementById('tsrc').textContent };
+}
+// Landmark callouts must show exactly what tools/gene_strip.py wrote.
+const GENE_STRIP = JSON.parse(fs.readFileSync(path.join(ROOT, 'presentation', 'assets', 'gene_strip.json'), 'utf8'));
+const fmtN = n => n.toLocaleString('en-US');
+const rankText = (rank, total) => {
+  const p = 100 * rank / total;
+  return p < 0.1 ? `#${fmtN(rank)} of ${fmtN(total)}` : `top ${p < 10 ? p.toFixed(1) : Math.round(p)}%`;
+};
+const S3_EXPECTED = Object.fromEntries((GENE_STRIP.landmarks || []).map(l =>
+  [l.gene, `log2 = ${l.log2.toFixed(2)} · ${rankText(l.rank, GENE_STRIP.genes_total)}`]));
+const GREEN = 'rgb(31, 157, 116)';
+
+function s3State() {
+  const vis = el => { for (let e = el; e && e.nodeType === 1; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.visibility === 'hidden' || +cs.opacity < 0.05) return false; } return true; };
+  const lm = [...document.querySelectorAll('#strip .lmb')];
+  return {
+    counter: document.getElementById('counter').textContent,
+    panels: [...document.querySelectorAll('#bioCard .bp.on')].length,
+    foot: +getComputedStyle(document.getElementById('biofoot')).opacity,
+    greyColours: [...new Set([...document.querySelectorAll('#strip .gb')].map(b => getComputedStyle(b).backgroundColor))],
+    greenShown: lm.filter(vis).length,
+    greenColours: [...new Set(lm.map(b => getComputedStyle(b).backgroundColor))],
+    callouts: Object.fromEntries([...document.querySelectorAll('#s3co .co')].filter(vis).map(c => [c.dataset.gene, c.querySelector('.cov').textContent])),
+    leaders: [...document.querySelectorAll('#s3lead path.on')].length,
+    links: document.getElementById('lkCard').classList.contains('on') ? document.querySelectorAll('#lkRow .lk').length : 0,
+    colourScale: [...document.querySelectorAll('#s3 *')].some(e => /gradient/.test(getComputedStyle(e).backgroundImage)),
+  };
+}
+
 const S2_GRID = '50 1 0 0 1 0 0 1 0 1 0 0';
 const S2_FILL = 'nA--A--A-A--'; // n = numeric fill, A = one-hot 1, - = 0
 
@@ -118,6 +181,7 @@ function analyze() {
   const issues = [];
   for (const t of texts) for (const g of graphics) {
     if (g.el.contains(t.node)) continue; // a box that holds its own label is a container, not an overlap
+    if (t.el.closest('.onimg') && g.el.closest('#wsi')) continue; // marker badges are placed on the slide image by design
     let i = inter(t.b, g.b);
     if (i && g.samples) i = g.samples.map(s => inter(t.b, s)).find(Boolean) || null;
     else if (i && g.ring) i = hitsRing(t.b, g.ring) ? i : null;
@@ -232,7 +296,16 @@ for (const [w, h] of VIEWPORTS) {
   const steps = await page.evaluate(() => [...document.querySelectorAll('.slide')].map(s => +s.dataset.steps));
   const rows = [];
   for (let s = 0; s < steps.length; s++) for (let k = 1; k <= steps[s]; k++) {
-    if (s === 1 && k === 2) {
+    if (s === 3 && k === 5) {
+      await page.keyboard.press('ArrowRight');
+      const t0 = Date.now();
+      for (const at of S4_MID_SHOTS) {
+        await page.waitForTimeout(Math.max(0, at - (Date.now() - t0)));
+        await page.screenshot({ path: path.join(OUT, tag, `slide4-step5-mid-${at / 1000}s.png`) });
+        shots++;
+      }
+      await page.waitForTimeout(Math.max(0, S4_TILES_MS - (Date.now() - t0)));
+    } else if (s === 1 && k === 2) {
       await page.keyboard.press('ArrowRight');
       const t0 = Date.now();
       for (const at of S2_MID_SHOTS) {
@@ -245,13 +318,42 @@ for (const [w, h] of VIEWPORTS) {
         }
       }
       await page.waitForTimeout(Math.max(0, S2_ENCODE_MS - (Date.now() - t0)));
-    } else if (s || k > 1) { await page.keyboard.press('ArrowRight'); await page.waitForTimeout(SETTLE_MS); }
+    } else if (s || k > 1) { await page.keyboard.press('ArrowRight'); await page.waitForTimeout(settleFor(s, k)); }
     const file = path.join(OUT, tag, `slide${s + 1}-step${k}.png`);
     await page.screenshot({ path: file });
     shots++;
     const a = await page.evaluate(analyze);
     const counter = await page.textContent('#counter');
     rows.push({ slide: s + 1, step: k, counter, texts: a.texts, graphics: a.graphics, issues: a.issues });
+    if (tag === '1920x1080' && s === 3 && k === 5) {
+      const m = await page.evaluate(s4State);
+      const ok = r => r.source === 'pipeline' || (r.source === 'template_match' && r.score >= 0.8);
+      const numbered = m.rings.filter(r => r.rank != null);
+      check('Slide 4 step 5: every numbered marker has real coordinates (pipeline, or template_match ≥ 0.8); otherwise un-numbered',
+        numbered.every(ok) && m.badges.length === numbered.length && m.rings.filter(r => r.rank == null).every(r => r.source === 'approximate'),
+        m.rings.map(r => `${r.rank ?? '–'}:${r.source}${r.score != null ? '@' + r.score : ''}`).join(' '));
+      const want = TOP_TILES.filter(d => d.source === 'pipeline' || (d.source === 'template_match' && d.score >= 0.8));
+      const kx = m.wsi.w / 705, ky = m.wsi.h / 519;
+      const off = want.map(d => { const r = m.rings.find(q => q.rank === d.rank); return r ? Math.hypot(r.x - (m.wsi.x + (d.x + d.w / 2) * kx), r.y - (m.wsi.y + (d.y + d.h / 2) * ky)) : Infinity; });
+      check(`Slide 4 step 5: ${want.length} markers sit on their top_tiles.json locations (±0.5 px)`, off.every(o => o <= 0.5), off.map(o => o.toFixed(2)).join(' '));
+      const halo = 2, pairs = [];
+      m.rings.forEach((a, i) => m.rings.slice(i + 1).forEach(b => { if (Math.hypot(a.x - b.x, a.y - b.y) < a.r + b.r + 2 * halo) pairs.push(`${a.rank}×${b.rank}`); }));
+      check('Slide 4 step 5: rings (with white halo) do not overlap each other', pairs.length === 0, pairs.join(' ') || `radii ${m.rings.map(r => r.r.toFixed(1)).join('/')}`);
+      const hitRing = (b, r) => Math.hypot(Math.max(b.x - r.x, 0, r.x - (b.x + b.w)), Math.max(b.y - r.y, 0, r.y - (b.y + b.h))) < r.r + halo;
+      const hitBox = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+      const clash = [];
+      m.badges.forEach((b, i) => {
+        m.rings.forEach(r => hitRing(b, r) && clash.push(`${b.text}×ring${r.rank}`));
+        m.badges.slice(i + 1).forEach(o => hitBox(b, o) && clash.push(`${b.text}×${o.text}`));
+        m.captions.forEach(c => hitBox(b, c) && clash.push(`${b.text}×caption`));
+      });
+      m.rings.forEach(r => m.captions.forEach(c => hitRing(c, r) && clash.push(`ring${r.rank}×caption`)));
+      check('Slide 4 step 5: badges clear of rings, other badges and the caption; rings clear of the caption', clash.length === 0, clash.join(' '));
+      check('Slide 4 step 5: no leader line crosses a tile image', m.leaderHits === 0 && m.leaders === numbered.length, `${m.leaders} leaders, ${m.leaderHits} crossing`);
+      check('Slide 4 step 5: final frame is static (no ring pulse running, magnifier gone)', m.rings.every(r => r.running === 0) && m.lens === 0,
+        `running=${m.rings.map(r => r.running).join('')} lens=${m.lens}`);
+      check('Slide 4 step 5: source note shown', /^Tile locations: (model tile coordinates|matched to the original slide|approximate)/.test(m.note), m.note);
+    }
     if (tag === '1920x1080' && s === 1) {
       const m = await page.evaluate(s2State);
       check(`Slide 2 step ${k}: counter shows 5 steps`, m.counter === `Slide 2/5 · Step ${k}/5`, m.counter);
@@ -267,7 +369,25 @@ for (const [w, h] of VIEWPORTS) {
     if (tag === '1920x1080') {
       if (s === 3) check(`Slide 4 step ${k}: top-attention tiles ${k === 5 ? 'shown' : 'hidden'}`, k === 5 ? a.topTiles === 6 : a.topTiles === 0, `${a.topTiles} visible`);
       else check(`Slide ${s + 1} step ${k}: no top-attention tiles`, a.topTiles === 0, `${a.topTiles} visible`);
-      if (s === 2) check(`Slide 3 step ${k}: no heatmap / per-gene colours`, a.s3media === 0 && a.s3colors.length === 1, `img/canvas=${a.s3media}, strip colours=${a.s3colors.join(',')}`);
+      if (s === 2) {
+        check(`Slide 3 step ${k}: no heatmap / per-gene colours`, a.s3media === 0 && a.s3colors.length === 1, `img/canvas=${a.s3media}, strip colours=${a.s3colors.join(',')}`);
+        const m = await page.evaluate(s3State);
+        const nLm = Object.keys(S3_EXPECTED).length;
+        check(`Slide 3 step ${k}: counter shows 5 steps`, m.counter === `Slide 3/5 · Step ${k}/5`, m.counter);
+        check(`Slide 3 step ${k}: no colour scale anywhere on the slide`, !m.colourScale && m.greyColours.length === 1 && m.greenColours.every(c => c === GREEN),
+          `grey=${m.greyColours.join(',')} green=${m.greenColours.join(',')} gradient=${m.colourScale}`);
+        if (k === 1) check('Slide 3 step 1: all four schematic panels and the result line shown, no landmark bars',
+          m.panels === 4 && m.foot === 1 && m.greenShown === 0, `panels=${m.panels} foot=${m.foot} green=${m.greenShown}`);
+        if (k === 2) {
+          check(`Slide 3 step 2: exactly ${nLm} green landmark bars, one leader each`, nLm <= 4 && m.greenShown === nLm && m.leaders === nLm,
+            `green=${m.greenShown} leaders=${m.leaders} expected=${nLm}`);
+          const bad = Object.entries(S3_EXPECTED).filter(([g, t]) => m.callouts[g] !== t);
+          check('Slide 3 step 2: landmark callouts match tools/gene_strip.py output', bad.length === 0 && Object.keys(m.callouts).length === nLm,
+            Object.entries(m.callouts).map(([g, t]) => `${g}: ${t}`).join(' | '));
+          check('Slide 3 step 2: clinical link row shows 3 cards', m.links === 3, `${m.links}`);
+        }
+        if (k >= 3) check(`Slide 3 step ${k}: clinical link row hidden again`, m.links === 0, `${m.links}`);
+      }
       if (s === 4) {
         check(`Slide 5 step ${k}: no "Encoder" boxes`, !a.encoderOnSlide);
         check(`Slide 5 step ${k}: all text ≥ 12px`, a.minFont >= 12, `min ${a.minFont}px`);
@@ -333,7 +453,7 @@ md += `Method: on every step, after animations settle, every visible text line b
   `(img, canvas, SVG primitives, cells/bars/connectors marked \`.g\`) and with every other text line box. A box that contains its own label ` +
   `(table cell, head box, Σ node) is treated as a container. Overflow = text leaving its card, a clipping ancestor, the stage, or entering the footer band. ` +
   `Any intersection > 0 px (rounded to 0.01 px) is reported, in 1600×900 stage pixels. ` +
-  `\`slide2-step2-mid-1.5s.png\` and \`slide2-step2-mid-3s.png\` are review frames taken during the slide 2 encoding animation; they are not overlap-checked.\n\n`;
+  `\`slide2-step2-mid-*.png\` (1.5 s, 3 s into the encoding) and \`slide4-step5-mid-*.png\` (0.5 s, 3 s into the tile reveal) are review frames; they are not overlap-checked.\n\n`;
 md += `**Total issues: ${total}**\n\n`;
 for (const [tag, rows] of Object.entries(report.viewports)) {
   md += `## ${tag}\n\n| Slide | Step | Text boxes | Graphics | Overlaps / overflows |\n|---|---|---|---|---|\n`;
