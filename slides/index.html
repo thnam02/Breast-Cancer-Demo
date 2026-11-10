@@ -688,7 +688,18 @@ let S = 0, K = 1, autoTimer = null, lastNav = 0, timers = [];
 
 function rng(seed) { let s = (seed * 2654435761) >>> 0 || 1; return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296); }
 function svgEl(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; }
-function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+// Playback speed for step animations: scheduled steps, scripted tweens and one-off CSS transitions/animations.
+// Looping ambience (network pulses, travelling dots, mRNA bob) keeps its own pace.
+const SPEED = 1.25;
+const tweened = new WeakSet();
+function speedAnims() {
+  for (const a of document.getAnimations()) {
+    if (tweened.has(a) || a.effect.getTiming().iterations === Infinity) continue;
+    a.playbackRate = SPEED;
+    tweened.add(a);
+  }
+}
+function later(fn, ms) { timers.push(setTimeout(() => { fn(); speedAnims(); }, ms / SPEED)); }
 function offsetIn(el, root) { let x = 0, y = 0; for (let e = el; e && e !== root; e = e.offsetParent) { x += e.offsetLeft; y += e.offsetTop; } return { x, y }; }
 
 /* ---------- layout ---------- */
@@ -775,9 +786,9 @@ function animateRings(on) {
   cancelAnimationFrame(ringRAF);
   const rings = $$('#s5 .ring5');
   if (!on) { rings.forEach(r => setRing(r, 1)); return; }
-  const t0 = performance.now() + 300;
+  const t0 = performance.now() + 300 / SPEED;
   const tick = t => {
-    const p = Math.min(1, Math.max(0, (t - t0) / 1500)), e = 1 - Math.pow(1 - p, 3);
+    const p = Math.min(1, Math.max(0, (t - t0) / (1500 / SPEED))), e = 1 - Math.pow(1 - p, 3);
     rings.forEach(r => setRing(r, e));
     if (p < 1) ringRAF = requestAnimationFrame(tick);
   };
@@ -1084,9 +1095,9 @@ function drawGrid(p) {
 }
 function sweepGrid() {
   cancelAnimationFrame(W4.raf);
-  const t0 = performance.now() + 250;
+  const t0 = performance.now() + 250 / SPEED;
   const tick = t => {
-    const p = Math.min(1, Math.max(0, (t - t0) / 2000));
+    const p = Math.min(1, Math.max(0, (t - t0) / (2000 / SPEED)));
     drawGrid(p);
     if (p < 1) W4.raf = requestAnimationFrame(tick);
   };
@@ -1162,7 +1173,7 @@ function countUp(cb) {
   setCell(cb, 'zero');
   cb.classList.add('num');
   const tick = t => {
-    const p = Math.min(1, Math.max(0, (t - t0) / 500));
+    const p = Math.min(1, Math.max(0, (t - t0) / (500 / SPEED)));
     d.textContent = Math.round(v * (1 - Math.pow(1 - p, 3)));
     if (p < 1) S2.raf = requestAnimationFrame(tick);
   };
@@ -1423,6 +1434,7 @@ function render(prevS, prevK) {
   $$('[data-only]', sl).forEach(e => e.classList.toggle('on', +e.dataset.only === K));
   const from = prevS === S ? prevK : (prevS < S ? 0 : 99);
   hooks[sl.id] && hooks[sl.id](K, from);
+  speedAnims();
   document.body.classList.toggle('dark', !!sl.dataset.dark);
   $('#fn').textContent = sl.dataset.foot || '';
   $('#counter').textContent = `Slide ${S + 1}/${slides.length} · Step ${K}/${+sl.dataset.steps}` + (autoTimer ? ' · auto' : '');
